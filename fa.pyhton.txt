@@ -1,0 +1,71 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+
+df = pd.read_csv("matches.csv")
+
+
+df.dropna(inplace=True)
+df['result'] = df.apply(
+    lambda row: 'Home Win' if row['home_score'] > row['away_score'] else (
+        'Away Win' if row['away_score'] > row['home_score'] else 'Draw'), axis=1)
+
+print("Sample data:")
+print(df.head())
+
+
+def team_stats(team):
+    team_home = df[df['home_team'] == team]
+    team_away = df[df['away_team'] == team]
+    total_matches = len(team_home) + len(team_away)
+    wins = len(team_home[team_home['home_score'] > team_home['away_score']]) + \
+           len(team_away[team_away['away_score'] > team_away['home_score']])
+    goals_scored = team_home['home_score'].sum() + team_away['away_score'].sum()
+    goals_conceded = team_home['away_score'].sum() + team_away['home_score'].sum()
+
+    return {
+        'Matches Played': total_matches,
+        'Wins': wins,
+        'Goals Scored': goals_scored,
+        'Goals Conceded': goals_conceded
+    }
+
+
+team = "Barcelona"
+print(f"\nStats for {team}:")
+print(team_stats(team))
+
+
+plt.figure(figsize=(6,4))
+sns.countplot(x='result', data=df)
+plt.title("Match Results Distribution")
+plt.show()
+
+
+features = df[['home_possession', 'away_possession']]
+target = df['result']
+
+target_encoded = target.map({'Home Win': 0, 'Draw': 1, 'Away Win': 2})
+
+X_train, X_test, y_train, y_test = train_test_split(features, target_encoded, test_size=0.3, random_state=42)
+
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print("\nModel Accuracy:", accuracy_score(y_test, y_pred))
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+
+def predict_result(home_poss, away_poss):
+    prediction = model.predict([[home_poss, away_poss]])[0]
+    return {0: 'Home Win', 1: 'Draw', 2: 'Away Win'}[prediction]
+
+
+print("\nPrediction for Home Possession=60, Away Possession=40")
+print("Predicted Result:", predict_result(60, 40))
